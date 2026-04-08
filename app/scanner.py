@@ -4,7 +4,7 @@ import asyncio
 import logging
 import ssl
 from datetime import timezone
-from typing import AsyncIterator, Dict, List, Optional, Set, Tuple
+from typing import AsyncIterator, Awaitable, Callable, Dict, List, Optional, Set, Tuple
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -12,6 +12,8 @@ from cryptography.hazmat.backends import default_backend
 from .config import Config, IPSpec
 
 logger = logging.getLogger(__name__)
+
+OnFoundCallback = Callable[[str, int, str, Dict], Awaitable[None]]
 
 
 # ---------------------------------------------------------------------------
@@ -112,26 +114,27 @@ async def _iter_targets(
 # Scan runner
 # ---------------------------------------------------------------------------
 
-ScanResult = Tuple[str, int, str, Dict]  # (host, port, descriptor, tls_info)
-
-
-async def run_scan(config: Config) -> Dict:
+async def run_scan(config: Config, on_found: Optional[OnFoundCallback] = None) -> Dict:
     """
     Execute a full scan of all configured IP specs across the configured port
-    range.  Returns a summary dict including the list of discovered targets.
+    range.
+
+    When a target is discovered it is passed immediately to ``on_found``
+    (if provided) so callers can persist or act on it without waiting for the
+    full scan to complete.
 
     Concurrency is controlled by config.max_workers (semaphore).  Tasks are
     streamed to bound memory usage — at most max_workers * 4 coroutines live
     in memory at once, regardless of how large the address space is.
     """
     semaphore = asyncio.Semaphore(config.max_workers)
-    found: List[ScanResult] = []
     scanned_hosts: Set[str] = set()
     total_probed = 0
+    targets_found = 0
     total_errors = 0
 
     async def probe(descriptor: str, host: str, port: int) -> None:
-        nonlocal total_probed, total_errors
+        nonlocal total_probed, targets_found, total_errors
         async with semaphore:
             scanned_hosts.add(host)
             total_probed += 1
@@ -139,11 +142,13 @@ async def run_scan(config: Config) -> Dict:
                 if await _tcp_open(host, port, config.connect_timeout):
                     tls = await _tls_probe(host, port, config.tls_timeout)
                     if tls is not None:
-                        found.append((host, port, descriptor, tls))
+                        targets_found += 1
                         logger.info(
                             "HTTPS found: %s:%d [%s] self_signed=%s",
                             host, port, descriptor, tls["self_signed"]
                         )
+                        if on_found is not None:
+                            await on_found(host, port, descriptor, tls)
             except Exception as exc:
                 total_errors += 1
                 logger.debug("Probe error %s:%d: %s", host, port, exc)
@@ -172,7 +177,6 @@ async def run_scan(config: Config) -> Dict:
         "scanned_hosts": scanned_hosts,
         "hosts_scanned": len(scanned_hosts),
         "total_probed": total_probed,
-        "targets_found": len(found),
-        "found": found,
+        "targets_found": targets_found,
         "errors": total_errors,
     }

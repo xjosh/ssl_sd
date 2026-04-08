@@ -46,16 +46,17 @@ async def execute_scan(config: Optional[Config] = None) -> Optional[int]:
                 cfg.port_range.start, cfg.port_range.end,
                 len(cfg.specs))
     try:
-        results = await run_scan(cfg)
-
-        seen_keys = set()
+        seen_keys: set = set()
         new_count = 0
 
-        for host, port, descriptor, tls_info in results["found"]:
+        async def on_found(host: str, port: int, descriptor: str, tls_info: dict) -> None:
+            nonlocal new_count
             outcome = await db.upsert_target(host, port, descriptor, tls_info)
             seen_keys.add((host, port))
             if outcome == "new":
                 new_count += 1
+
+        results = await run_scan(cfg, on_found=on_found)
 
         deactivated = await db.mark_unseen_inactive(
             seen_keys, results["scanned_hosts"]
