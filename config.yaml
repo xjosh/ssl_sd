@@ -1,0 +1,37 @@
+# SSL Service Discovery Configuration
+
+# How often to run a full scan (seconds). Default: 3600 (1 hour)
+scan_interval: 3600
+
+# Maximum concurrent TCP connections during a scan.
+# Higher = faster scans, more network load. Default: 500
+max_workers: 500
+
+# Timeout for initial TCP connect probe (seconds)
+connect_timeout: 1.0
+
+# Timeout for TLS handshake after TCP connect succeeds (seconds)
+tls_timeout: 3.0
+
+# Port range to scan on each host (inclusive).
+# Scanning all 65535 ports on a /24 takes significant time.
+# Narrow this range for faster cycles if you know your port space.
+port_range:
+  start: 1
+  end: 65535
+
+# IP specifications to scan. Each spec has a descriptor (label for admin UI
+# and Prometheus labels) and a network definition in one of these forms:
+#   - Single IP:   "192.168.1.100"
+#   - CIDR:        "192.168.1.0/24"
+#   - Full range:  "192.168.1.1-192.168.1.50"
+#   - Short range: "192.168.1.1-50"
+specs:
+  - descriptor: "Home Lab"
+    spec: "192.168.1.0/24"
+
+  - descriptor: "DMZ"
+    spec: "10.0.0.1-10.0.0.50"
+
+  - descriptor: "Gateway"
+    spec: "10.0.1.1"

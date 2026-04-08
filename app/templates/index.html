@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — SSL SD{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <h4 class="mb-0 me-auto">Dashboard</h4>
+  <form method="post" action="/scans/trigger">
+    <button class="btn btn-primary btn-sm" {% if scanning %}disabled{% endif %}>
+      {% if scanning %}Scan running…{% else %}Run Scan Now{% endif %}
+    </button>
+  </form>
+</div>
+
+<!-- Stat cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <div class="display-6 fw-bold">{{ stats.total }}</div>
+        <div class="text-muted small">Total Targets</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100 border-success">
+      <div class="card-body">
+        <div class="display-6 fw-bold text-success">{{ stats.active }}</div>
+        <div class="text-muted small">Active</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100 border-secondary">
+      <div class="card-body">
+        <div class="display-6 fw-bold text-secondary">{{ stats.inactive }}</div>
+        <div class="text-muted small">Inactive</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100 border-warning">
+      <div class="card-body">
+        <div class="display-6 fw-bold text-warning">{{ stats.self_signed }}</div>
+        <div class="text-muted small">Self-Signed (active)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Last scan summary -->
+<div class="row g-3 mb-4">
+  <div class="col-12 col-lg-5">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Last Scan</div>
+      <div class="card-body">
+        {% if stats.last_scan %}
+          {% set s = stats.last_scan %}
+          <table class="table table-sm table-borderless mb-0">
+            <tr><th class="w-50 text-muted">Status</th>
+                <td>
+                  {% if s.status == 'completed' %}
+                    <span class="badge bg-success">completed</span>
+                  {% elif s.status == 'running' %}
+                    <span class="badge bg-warning text-dark">running</span>
+                  {% else %}
+                    <span class="badge bg-danger">{{ s.status }}</span>
+                  {% endif %}
+                </td></tr>
+            <tr><th class="text-muted">Started</th>
+                <td>{{ s.started_at | fmt_dt }}</td></tr>
+            <tr><th class="text-muted">Duration</th>
+                <td>{{ scan_duration(s) }}</td></tr>
+            <tr><th class="text-muted">Hosts scanned</th>
+                <td>{{ s.hosts_scanned }}</td></tr>
+            <tr><th class="text-muted">Targets found</th>
+                <td>{{ s.targets_found }}</td></tr>
+            <tr><th class="text-muted">New</th>
+                <td>{{ s.new_targets }}</td></tr>
+            <tr><th class="text-muted">Deactivated</th>
+                <td>{{ s.deactivated }}</td></tr>
+          </table>
+        {% else %}
+          <p class="text-muted mb-0">No scans have run yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent scan history -->
+  <div class="col-12 col-lg-7">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Recent Scans</span>
+        <a href="/scans" class="btn btn-sm btn-outline-secondary">View all</a>
+      </div>
+      <div class="card-body p-0">
+        {% if scans %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>#</th><th>Started</th><th>Duration</th>
+                <th>Found</th><th>New</th><th>Deact.</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in scans %}
+              <tr>
+                <td class="text-muted">{{ s.id }}</td>
+                <td>{{ s.started_at | fmt_dt }}</td>
+                <td>{{ scan_duration(s) }}</td>
+                <td>{{ s.targets_found }}</td>
+                <td>{{ s.new_targets }}</td>
+                <td>{{ s.deactivated }}</td>
+                <td>
+                  {% if s.status == 'completed' %}
+                    <span class="badge bg-success">ok</span>
+                  {% elif s.status == 'running' %}
+                    <span class="badge bg-warning text-dark">running</span>
+                  {% else %}
+                    <span class="badge bg-danger">{{ s.status }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <p class="text-muted p-3 mb-0">No scans yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Prometheus config hint -->
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Prometheus Configuration</div>
+  <div class="card-body">
+    <p class="text-muted small mb-2">
+      Point your Prometheus <code>http_sd_configs</code> at the <code>/sd</code> endpoint:
+    </p>
+    <pre class="bg-light p-3 rounded small mb-0">- job_name: "ssl"
+  metrics_path: /probe
+  http_sd_configs:
+    - url: http://ssl-sd:8080/sd
+      refresh_interval: 60s
+  relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - source_labels: [__param_target]
+      target_label: instance
+    - target_label: __address__
+      replacement: ssl-exporter:9219</pre>
+  </div>
+</div>
+{% endblock %}

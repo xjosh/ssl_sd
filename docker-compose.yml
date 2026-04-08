@@ -1,0 +1,16 @@
+services:
+  ssl-sd:
+    build: .
+    container_name: ssl-sd
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      - ssl_sd_data:/data
+    restart: unless-stopped
+    # The scanner needs to reach your target networks.
+    # Use host networking if targets are on local subnets not routable through Docker.
+    # network_mode: host
+
+volumes:
+  ssl_sd_data:

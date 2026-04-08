@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Targets — SSL SD{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+  <h4 class="mb-0 me-auto">Targets</h4>
+  <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addModal">
+    + Add Target
+  </button>
+</div>
+
+<!-- Status filter tabs -->
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link {% if not status_filter %}active{% endif %}" href="/targets">All</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if status_filter == 'active' %}active{% endif %}" href="/targets?status=active">Active</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if status_filter == 'inactive' %}active{% endif %}" href="/targets?status=inactive">
+      Inactive
+      {% set inactive_count = targets | selectattr('status', 'eq', 'inactive') | list | length %}
+    </a>
+  </li>
+</ul>
+
+{% if targets %}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0" id="targetTable">
+        <thead class="table-light">
+          <tr>
+            <th>Target</th>
+            <th>Descriptor</th>
+            <th>Status</th>
+            <th>Self-Signed</th>
+            <th>Cert Expiry</th>
+            <th>Last Seen</th>
+            <th>First Seen</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in targets %}
+          {% set days = t.cert_expiry | days_until %}
+          <tr>
+            <td class="font-monospace fw-semibold">{{ t.ip }}:{{ t.port }}</td>
+            <td>{{ t.descriptor or '—' }}</td>
+            <td>
+              {% if t.status == 'active' %}
+                <span class="badge bg-success">active</span>
+              {% else %}
+                <span class="badge bg-secondary">inactive</span>
+                <small class="text-muted d-block" style="font-size:.7rem">host not found in last scan</small>
+              {% endif %}
+            </td>
+            <td>
+              {% if t.self_signed %}
+                <span class="badge bg-warning text-dark">self-signed</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if t.cert_expiry %}
+                {% if days is none %}
+                  <span class="expiry-na">{{ t.cert_expiry | fmt_dt }}</span>
+                {% elif days < 0 %}
+                  <span class="expiry-expired" title="{{ t.cert_expiry | fmt_dt }}">Expired {{ days | abs }} days ago</span>
+                {% elif days <= 14 %}
+                  <span class="expiry-danger" title="{{ t.cert_expiry | fmt_dt }}">{{ days }}d remaining</span>
+                {% elif days <= 30 %}
+                  <span class="expiry-warn" title="{{ t.cert_expiry | fmt_dt }}">{{ days }}d remaining</span>
+                {% else %}
+                  <span class="expiry-ok" title="{{ t.cert_expiry | fmt_dt }}">{{ days }}d remaining</span>
+                {% endif %}
+              {% else %}
+                <span class="expiry-na">N/A</span>
+              {% endif %}
+            </td>
+            <td class="text-muted small">{{ t.last_seen | fmt_dt }}</td>
+            <td class="text-muted small">{{ t.first_seen | fmt_dt }}</td>
+            <td>
+              <div class="d-flex gap-1 flex-wrap">
+                {% if t.status == 'active' %}
+                  <form method="post" action="/targets/{{ t.id }}/deactivate">
+                    <button class="btn btn-outline-secondary btn-sm" type="submit"
+                            title="Mark inactive (keeps in DB, removes from SD)">Deactivate</button>
+                  </form>
+                {% else %}
+                  <form method="post" action="/targets/{{ t.id }}/activate">
+                    <button class="btn btn-outline-success btn-sm" type="submit"
+                            title="Re-enable — will be included in SD until next scan">Activate</button>
+                  </form>
+                {% endif %}
+                <form method="post" action="/targets/{{ t.id }}/delete"
+                      onsubmit="return confirm('Delete {{ t.ip }}:{{ t.port }}?')">
+                  <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted small">
+    {{ targets | length }} target(s) shown
+  </div>
+</div>
+{% else %}
+  <div class="alert alert-secondary">No targets found.</div>
+{% endif %}
+
+<!-- Add Target Modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/targets/add">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Target Manually</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">
+            Manually registered targets are preserved across scans. If the IP is outside
+            configured specs, it will never be auto-deactivated.
+          </p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">IP Address</label>
+            <input type="text" name="ip" class="form-control font-monospace"
+                   placeholder="192.168.1.100" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Port</label>
+            <input type="number" name="port" class="form-control font-monospace"
+                   placeholder="443" min="1" max="65535" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Descriptor</label>
+            <input type="text" name="descriptor" class="form-control"
+                   placeholder="My Server">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">Add Target</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Simple client-side filter
+  const input = document.createElement('input');
+  input.className = 'form-control form-control-sm mb-3';
+  input.placeholder = 'Filter by IP, descriptor, port…';
+  input.style.maxWidth = '300px';
+  const table = document.getElementById('targetTable');
+  if (table) {
+    table.parentElement.parentElement.insertBefore(input, table.parentElement);
+    input.addEventListener('input', () => {
+      const q = input.value.toLowerCase();
+      table.querySelectorAll('tbody tr').forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Scan History — SSL SD{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <h4 class="mb-0 me-auto">Scan History</h4>
+  <form method="post" action="/scans/trigger">
+    <button class="btn btn-primary btn-sm" {% if scanning %}disabled{% endif %}>
+      {% if scanning %}Scan running…{% else %}Run Scan Now{% endif %}
+    </button>
+  </form>
+</div>
+
+{% if scans %}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Started</th>
+            <th>Duration</th>
+            <th>Hosts Scanned</th>
+            <th>Targets Found</th>
+            <th>New</th>
+            <th>Deactivated</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in scans %}
+          <tr>
+            <td class="text-muted">{{ s.id }}</td>
+            <td>{{ s.started_at | fmt_dt }}</td>
+            <td>{{ scan_duration(s) }}</td>
+            <td>{{ s.hosts_scanned }}</td>
+            <td>{{ s.targets_found }}</td>
+            <td>
+              {% if s.new_targets %}
+                <span class="text-success fw-semibold">+{{ s.new_targets }}</span>
+              {% else %}
+                0
+              {% endif %}
+            </td>
+            <td>
+              {% if s.deactivated %}
+                <span class="text-warning fw-semibold">{{ s.deactivated }}</span>
+              {% else %}
+                0
+              {% endif %}
+            </td>
+            <td>
+              {% if s.status == 'completed' %}
+                <span class="badge bg-success">completed</span>
+              {% elif s.status == 'running' %}
+                <span class="badge bg-warning text-dark">running</span>
+              {% else %}
+                <span class="badge bg-danger">{{ s.status }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted small">{{ scans | length }} scan(s) shown (most recent first)</div>
+</div>
+{% else %}
+  <div class="alert alert-secondary">No scans have run yet.</div>
+{% endif %}
+{% endblock %}
