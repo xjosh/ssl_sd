@@ -40,6 +40,9 @@
         <li class="nav-item">
           <a class="nav-link {% if request.url.path.startswith('/scans') %}active{% endif %}" href="/scans">Scan History</a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.url.path.startswith('/specs') %}active{% endif %}" href="/specs">Scan Scope</a>
+        </li>
       </ul>
       <span class="navbar-text me-3">
         {% if scanning %}

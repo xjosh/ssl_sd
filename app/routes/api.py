@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from .. import database as db
 from .. import scheduler
+from ..config import IPSpec
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -90,6 +91,57 @@ async def trigger_scan():
         raise HTTPException(409, "A scan is already in progress")
     asyncio.create_task(scheduler.execute_scan())
     return {"message": "Scan started"}
+
+
+# ---------------------------------------------------------------------------
+# Specs
+# ---------------------------------------------------------------------------
+
+class SpecCreate(BaseModel):
+    descriptor: str
+    spec: str
+
+
+class SpecUpdate(BaseModel):
+    descriptor: Optional[str] = None
+    spec: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+@router.get("/specs")
+async def list_specs(enabled_only: bool = False):
+    return await db.get_specs(enabled_only=enabled_only)
+
+
+@router.post("/specs", status_code=201)
+async def create_spec(body: SpecCreate):
+    """Add a new IP spec (host, CIDR, or range) to the scan scope."""
+    try:
+        IPSpec(descriptor=body.descriptor, spec=body.spec).expand_hosts()
+    except ValueError as exc:
+        raise HTTPException(400, f"Invalid spec: {exc}")
+    return await db.create_spec(body.descriptor, body.spec)
+
+
+@router.patch("/specs/{spec_id}")
+async def update_spec(spec_id: int, body: SpecUpdate):
+    if body.spec is not None:
+        try:
+            IPSpec(descriptor="validate", spec=body.spec).expand_hosts()
+        except ValueError as exc:
+            raise HTTPException(400, f"Invalid spec: {exc}")
+    ok = await db.update_spec(spec_id, body.descriptor, body.spec, body.enabled)
+    if not ok:
+        raise HTTPException(404, "Spec not found")
+    return await db.get_spec(spec_id)
+
+
+@router.delete("/specs/{spec_id}")
+async def delete_spec(spec_id: int):
+    ok = await db.delete_spec(spec_id)
+    if not ok:
+        raise HTTPException(404, "Spec not found")
+    return {"deleted": True}
 
 
 # ---------------------------------------------------------------------------

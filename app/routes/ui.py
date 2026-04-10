@@ -138,6 +138,53 @@ async def deactivate_target(target_id: int):
 
 
 # ---------------------------------------------------------------------------
+# Specs page
+# ---------------------------------------------------------------------------
+
+@router.get("/specs", response_class=HTMLResponse)
+async def specs_page(request: Request):
+    specs = await db.get_specs()
+    return templates.TemplateResponse("specs.html", {
+        "request": request,
+        "specs": specs,
+        "scanning": scheduler.is_scanning(),
+    })
+
+
+@router.post("/specs/add")
+async def add_spec(
+    descriptor: str = Form(...),
+    spec: str = Form(...),
+):
+    from ..config import IPSpec
+    try:
+        IPSpec(descriptor=descriptor, spec=spec).expand_hosts()
+    except ValueError as exc:
+        # Redirect back with an error — keep it simple for now
+        return RedirectResponse(f"/specs?error={exc}", status_code=303)
+    await db.create_spec(descriptor, spec)
+    return RedirectResponse("/specs", status_code=303)
+
+
+@router.post("/specs/{spec_id}/delete")
+async def delete_spec(spec_id: int):
+    await db.delete_spec(spec_id)
+    return RedirectResponse("/specs", status_code=303)
+
+
+@router.post("/specs/{spec_id}/enable")
+async def enable_spec(spec_id: int):
+    await db.update_spec(spec_id, enabled=True)
+    return RedirectResponse("/specs", status_code=303)
+
+
+@router.post("/specs/{spec_id}/disable")
+async def disable_spec(spec_id: int):
+    await db.update_spec(spec_id, enabled=False)
+    return RedirectResponse("/specs", status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Scan actions
 # ---------------------------------------------------------------------------
 

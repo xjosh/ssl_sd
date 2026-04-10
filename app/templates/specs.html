@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Scan Scope — SSL SD{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+  <h4 class="mb-0 me-auto">Scan Scope</h4>
+  <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addModal">
+    + Add Spec
+  </button>
+</div>
+
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible">
+  Invalid spec: {{ request.query_params.get('error') }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<p class="text-muted small mb-3">
+  Specs define the IP space to scan. Each entry accepts a single IP, CIDR notation,
+  or a range (<code>10.0.0.1-50</code> or <code>10.0.0.1-10.0.0.50</code>).
+  Disabled specs are skipped at scan time but preserved for re-enabling.
+  Changes take effect on the next scan — no restart required.
+</p>
+
+{% if specs %}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Descriptor</th>
+            <th>Spec</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Updated</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in specs %}
+          <tr class="{% if not s.enabled %}text-muted{% endif %}">
+            <td class="fw-semibold">{{ s.descriptor }}</td>
+            <td class="font-monospace">{{ s.spec }}</td>
+            <td>
+              {% if s.enabled %}
+                <span class="badge bg-success">enabled</span>
+              {% else %}
+                <span class="badge bg-secondary">disabled</span>
+              {% endif %}
+            </td>
+            <td class="small">{{ s.created_at | fmt_dt }}</td>
+            <td class="small">{{ s.updated_at | fmt_dt }}</td>
+            <td>
+              <div class="d-flex gap-1">
+                {% if s.enabled %}
+                  <form method="post" action="/specs/{{ s.id }}/disable">
+                    <button class="btn btn-outline-secondary btn-sm">Disable</button>
+                  </form>
+                {% else %}
+                  <form method="post" action="/specs/{{ s.id }}/enable">
+                    <button class="btn btn-outline-success btn-sm">Enable</button>
+                  </form>
+                {% endif %}
+                <form method="post" action="/specs/{{ s.id }}/delete"
+                      onsubmit="return confirm('Delete spec \'{{ s.spec }}\'?')">
+                  <button class="btn btn-outline-danger btn-sm">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted small">{{ specs | length }} spec(s)</div>
+</div>
+{% else %}
+  <div class="alert alert-secondary">
+    No specs defined. Add one above to start scanning.
+  </div>
+{% endif %}
+
+<!-- Add Spec Modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/specs/add">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Scan Spec</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Descriptor</label>
+            <input type="text" name="descriptor" class="form-control"
+                   placeholder="Home Lab" required>
+            <div class="form-text">Label used in the admin UI and as a Prometheus label.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Spec</label>
+            <input type="text" name="spec" class="form-control font-monospace"
+                   placeholder="192.168.1.0/24" required>
+            <div class="form-text">
+              Single IP (<code>10.0.0.1</code>), CIDR (<code>10.0.0.0/24</code>),
+              or range (<code>10.0.0.1-50</code>).
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">Add Spec</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

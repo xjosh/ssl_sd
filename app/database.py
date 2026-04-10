@@ -49,6 +49,15 @@ async def setup() -> None:
                 deactivated    INTEGER DEFAULT 0,
                 status         TEXT NOT NULL DEFAULT 'running'
             );
+
+            CREATE TABLE IF NOT EXISTS specs (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                descriptor  TEXT    NOT NULL,
+                spec        TEXT    NOT NULL,
+                enabled     INTEGER NOT NULL DEFAULT 1,
+                created_at  TEXT    NOT NULL,
+                updated_at  TEXT    NOT NULL
+            );
         """)
         await conn.commit()
 
@@ -259,6 +268,101 @@ async def get_stats() -> Dict:
             "self_signed": self_signed,
             "last_scan": dict(last_scan) if last_scan else None,
         }
+
+
+# ---------------------------------------------------------------------------
+# Spec operations
+# ---------------------------------------------------------------------------
+
+async def get_specs(enabled_only: bool = False) -> List[Dict]:
+    async with _db() as conn:
+        if enabled_only:
+            cur = await conn.execute(
+                "SELECT * FROM specs WHERE enabled=1 ORDER BY descriptor, spec"
+            )
+        else:
+            cur = await conn.execute(
+                "SELECT * FROM specs ORDER BY descriptor, spec"
+            )
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_spec(spec_id: int) -> Optional[Dict]:
+    async with _db() as conn:
+        row = await (
+            await conn.execute("SELECT * FROM specs WHERE id=?", (spec_id,))
+        ).fetchone()
+        return dict(row) if row else None
+
+
+async def create_spec(descriptor: str, spec: str) -> Dict:
+    now = _now()
+    async with _db() as conn:
+        cur = await conn.execute(
+            "INSERT INTO specs (descriptor, spec, enabled, created_at, updated_at) VALUES (?,?,1,?,?)",
+            (descriptor, spec, now, now),
+        )
+        await conn.commit()
+        row = await (
+            await conn.execute("SELECT * FROM specs WHERE id=?", (cur.lastrowid,))
+        ).fetchone()
+        return dict(row)
+
+
+async def update_spec(
+    spec_id: int,
+    descriptor: Optional[str] = None,
+    spec: Optional[str] = None,
+    enabled: Optional[bool] = None,
+) -> bool:
+    now = _now()
+    clauses = ["updated_at=?"]
+    values: list = [now]
+    if descriptor is not None:
+        clauses.append("descriptor=?")
+        values.append(descriptor)
+    if spec is not None:
+        clauses.append("spec=?")
+        values.append(spec)
+    if enabled is not None:
+        clauses.append("enabled=?")
+        values.append(int(enabled))
+    values.append(spec_id)
+    async with _db() as conn:
+        cur = await conn.execute(
+            f"UPDATE specs SET {', '.join(clauses)} WHERE id=?", values
+        )
+        await conn.commit()
+        return cur.rowcount > 0
+
+
+async def delete_spec(spec_id: int) -> bool:
+    async with _db() as conn:
+        cur = await conn.execute("DELETE FROM specs WHERE id=?", (spec_id,))
+        await conn.commit()
+        return cur.rowcount > 0
+
+
+async def import_specs(specs_from_config: list) -> int:
+    """
+    Seed the specs table from config file entries.
+    Only runs if the specs table is currently empty.
+    Returns number of specs imported.
+    """
+    async with _db() as conn:
+        count = (
+            await (await conn.execute("SELECT COUNT(*) FROM specs")).fetchone()
+        )[0]
+        if count > 0:
+            return 0
+        now = _now()
+        for s in specs_from_config:
+            await conn.execute(
+                "INSERT INTO specs (descriptor, spec, enabled, created_at, updated_at) VALUES (?,?,1,?,?)",
+                (s.descriptor, s.spec, now, now),
+            )
+        await conn.commit()
+        return len(specs_from_config)
 
 
 # ---------------------------------------------------------------------------

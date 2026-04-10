@@ -41,10 +41,23 @@ async def execute_scan(config: Optional[Config] = None) -> Optional[int]:
 
     _scanning = True
     scan_id = await db.create_scan()
+
+    # Load specs from DB at scan time so changes take effect without restart
+    from .config import IPSpec
+    raw_specs = await db.get_specs(enabled_only=True)
+    if not raw_specs:
+        logger.warning("Scan %d: no enabled specs in DB; nothing to scan", scan_id)
+        await db.complete_scan(scan_id, 0, 0, 0, 0, status="completed")
+        _scanning = False
+        return scan_id
+
+    ip_specs = [IPSpec(descriptor=s["descriptor"], spec=s["spec"]) for s in raw_specs]
+    scan_cfg = cfg.model_copy(update={"specs": ip_specs})
+
     logger.info("Scan %d started (workers=%d, ports=%d-%d, specs=%d)",
-                scan_id, cfg.max_workers,
-                cfg.port_range.start, cfg.port_range.end,
-                len(cfg.specs))
+                scan_id, scan_cfg.max_workers,
+                scan_cfg.port_range.start, scan_cfg.port_range.end,
+                len(ip_specs))
     try:
         seen_keys: set = set()
         new_count = 0
@@ -56,7 +69,7 @@ async def execute_scan(config: Optional[Config] = None) -> Optional[int]:
             if outcome == "new":
                 new_count += 1
 
-        results = await run_scan(cfg, on_found=on_found)
+        results = await run_scan(scan_cfg, on_found=on_found)
 
         deactivated = await db.mark_unseen_inactive(
             seen_keys, results["scanned_hosts"]

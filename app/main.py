@@ -24,13 +24,18 @@ async def lifespan(app: FastAPI):
     db.init(config.db_path)
     await db.setup()
 
+    # One-time migration: seed DB specs from config.yaml if specs table is empty
+    if config.specs:
+        imported = await db.import_specs(config.specs)
+        if imported:
+            logger.info("Migrated %d spec(s) from config.yaml into DB", imported)
+
     logger.info(
-        "ssl_sd starting | interval=%ds workers=%d ports=%d-%d specs=%d",
+        "ssl_sd starting | interval=%ds workers=%d ports=%d-%d",
         config.scan_interval,
         config.max_workers,
         config.port_range.start,
         config.port_range.end,
-        len(config.specs),
     )
 
     loop_task = asyncio.create_task(scan_loop(config))
