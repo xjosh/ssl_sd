@@ -70,8 +70,10 @@
                 <td>{{ s.started_at | fmt_dt }}</td></tr>
             <tr><th class="text-muted">Duration</th>
                 <td>{{ scan_duration(s) }}</td></tr>
-            <tr><th class="text-muted">Hosts scanned</th>
+            <tr><th class="text-muted">Hosts alive</th>
                 <td>{{ s.hosts_scanned }}</td></tr>
+            <tr><th class="text-muted">Hosts skipped</th>
+                <td class="text-muted">{{ s.hosts_skipped or 0 }}</td></tr>
             <tr><th class="text-muted">Targets found</th>
                 <td>{{ s.targets_found }}</td></tr>
             <tr><th class="text-muted">New</th>

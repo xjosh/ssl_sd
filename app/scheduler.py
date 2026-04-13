@@ -47,7 +47,7 @@ async def execute_scan(config: Optional[Config] = None) -> Optional[int]:
     raw_specs = await db.get_specs(enabled_only=True)
     if not raw_specs:
         logger.warning("Scan %d: no enabled specs in DB; nothing to scan", scan_id)
-        await db.complete_scan(scan_id, 0, 0, 0, 0, status="completed")
+        await db.complete_scan(scan_id, 0, 0, 0, 0, 0, status="completed")
         _scanning = False
         return scan_id
 
@@ -78,20 +78,22 @@ async def execute_scan(config: Optional[Config] = None) -> Optional[int]:
         await db.complete_scan(
             scan_id,
             hosts_scanned=results["hosts_scanned"],
+            hosts_skipped=results["hosts_skipped"],
             targets_found=results["targets_found"],
             new_targets=new_count,
             deactivated=deactivated,
             status="completed",
         )
         logger.info(
-            "Scan %d complete: %d targets (%d new, %d deactivated)",
-            scan_id, results["targets_found"], new_count, deactivated,
+            "Scan %d complete: %d/%d hosts alive, %d targets (%d new, %d deactivated)",
+            scan_id, results["hosts_scanned"], results["hosts_checked"],
+            results["targets_found"], new_count, deactivated,
         )
         return scan_id
 
     except Exception as exc:
         logger.error("Scan %d failed: %s", scan_id, exc, exc_info=True)
-        await db.complete_scan(scan_id, 0, 0, 0, 0, status="failed")
+        await db.complete_scan(scan_id, 0, 0, 0, 0, 0, status="failed")
         return scan_id
     finally:
         _scanning = False

@@ -75,6 +75,13 @@ class Config(BaseModel):
     port_range: PortRange = PortRange()
     db_path: str = "/data/ssl_sd.db"
     specs: List[IPSpec] = []
+    # Pre-check: TCP probe a small set of common ports before doing a full
+    # port scan on each host.  A host that responds to ANY of these (open or
+    # RST) is considered alive.  Hosts that time out on all precheck ports are
+    # skipped entirely, saving connect_timeout * port_range per dead IP.
+    # Set to an empty list to disable pre-checking.
+    precheck_ports: List[int] = [22, 80, 443, 8080]
+    precheck_timeout: float = 0.5
 
 
 def load_config(path: str = "/config/config.yaml") -> Config:

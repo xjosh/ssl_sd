@@ -44,6 +44,7 @@ async def setup() -> None:
                 started_at     TEXT NOT NULL,
                 completed_at   TEXT,
                 hosts_scanned  INTEGER DEFAULT 0,
+                hosts_skipped  INTEGER DEFAULT 0,
                 targets_found  INTEGER DEFAULT 0,
                 new_targets    INTEGER DEFAULT 0,
                 deactivated    INTEGER DEFAULT 0,
@@ -212,6 +213,7 @@ async def create_scan() -> int:
 async def complete_scan(
     scan_id: int,
     hosts_scanned: int,
+    hosts_skipped: int,
     targets_found: int,
     new_targets: int,
     deactivated: int,
@@ -220,10 +222,10 @@ async def complete_scan(
     async with _db() as conn:
         await conn.execute(
             """UPDATE scans
-               SET completed_at=?, hosts_scanned=?, targets_found=?,
+               SET completed_at=?, hosts_scanned=?, hosts_skipped=?, targets_found=?,
                    new_targets=?, deactivated=?, status=?
                WHERE id=?""",
-            (_now(), hosts_scanned, targets_found, new_targets, deactivated, status, scan_id),
+            (_now(), hosts_scanned, hosts_skipped, targets_found, new_targets, deactivated, status, scan_id),
         )
         await conn.commit()
 

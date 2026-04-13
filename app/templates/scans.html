@@ -21,7 +21,8 @@
             <th>#</th>
             <th>Started</th>
             <th>Duration</th>
-            <th>Hosts Scanned</th>
+            <th>Hosts Alive</th>
+            <th>Hosts Skipped</th>
             <th>Targets Found</th>
             <th>New</th>
             <th>Deactivated</th>
@@ -35,6 +36,7 @@
             <td>{{ s.started_at | fmt_dt }}</td>
             <td>{{ scan_duration(s) }}</td>
             <td>{{ s.hosts_scanned }}</td>
+            <td class="text-muted">{{ s.hosts_skipped or 0 }}</td>
             <td>{{ s.targets_found }}</td>
             <td>
               {% if s.new_targets %}
